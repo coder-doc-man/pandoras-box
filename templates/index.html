@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCQ Collator</title>
+    <style>
+        /* --- General Styles & Layout --- */
+        :root {
+            --primary-bg: #f8f9fa;
+            --secondary-bg: #ffffff;
+            --border-color: #dee2e6;
+            --text-color: #212529;
+            --muted-text-color: #6c757d;
+            --primary-color: #007bff;
+            --success-color: #155724;
+            --success-bg: #d4edda;
+            --success-border: #c3e6cb;
+            --error-color: #721c24;
+            --error-bg: #f8d7da;
+            --error-border: #f5c6cb;
+            --info-color: #0c5460;
+            --info-bg: #d1ecf1;
+            --info-border: #bee5eb;
+            --hover-bg: #e9ecef;
+            --selected-bg: #e7f1ff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            max-width: 1000px;
+            margin: 20px auto;
+        }
+        h1, h2 {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            color: #343a40;
+            margin-top: 1em;
+            margin-bottom: 0.8em;
+        }
+        h1 { font-size: 2em; }
+        h2 { font-size: 1.5em; }
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+            border: 1px solid #adb5bd;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-right: 5px;
+            transition: background-color 0.2s ease;
+            font-size: 0.95em;
+        }
+        button:hover:not(:disabled) { background-color: var(--hover-bg); }
+        button:disabled { cursor: not-allowed; opacity: 0.6; }
+        input[type="text"], input[type="file"], input[type="date"] { /* Added input[type="date"] */
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        label { margin-right: 5px; font-weight: bold; }
+
+        /* --- Sections --- */
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background-color: var(--secondary-bg);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        /* --- Upload Section --- */
+        #upload-form { /* Adjusted styling slightly */
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        .file-selection-area { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+        #selected-filename { font-style: italic; color: var(--muted-text-color); font-size: 0.9em; margin-left: 5px; }
+
+        /* NEW: Date Range Selection Area */
+        #date-range-section {
+            margin-top: 15px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #f8f9fa; /* Slightly different background */
+            display: none; /* Hidden by default */
+        }
+        #date-range-section label { margin-right: 8px; }
+        #date-range-inputs { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 8px; }
+        #date-range-info {
+             margin-bottom: 10px; padding: 8px 12px; border-radius: 4px;
+             font-size: 0.9em; display: none; /* Hidden until there's info */
+             background-color: var(--info-bg); color: var(--info-color); border: 1px solid var(--info-border);
+        }
+        #date-range-info.error {
+             background-color: var(--error-bg); color: var(--error-color); border: 1px solid var(--error-border);
+        }
+        #date-range-info.success {
+             background-color: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-border);
+        }
+
+        #status-message { /* Renamed from #upload-status-message */
+            margin-top: 15px; padding: 10px 15px; border-radius: 4px; display: none;
+        }
+        .status-success { background-color: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-border); }
+        .status-error { background-color: var(--error-bg); color: var(--error-color); border: 1px solid var(--error-border); }
+
+        /* --- Loading Spinner --- */
+        #loading-indicator { /* Repositioned slightly relative to button */
+             display: none; align-items: center; gap: 8px; font-style: italic; color: var(--muted-text-color);
+             margin-left: 10px; /* Add some space from the button */
+        }
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid #f3f3f3; /* Light grey */
+            border-top: 2px solid var(--primary-color); /* Blue */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- Questions Section --- */
+        /* ... (Keep existing styles for Questions Section, Pagination etc.) ... */
+         .persistent-controls {
+            padding: 15px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .filter-controls { display: flex; align-items: center; gap: 10px; }
+        .selection-controls { display: flex; align-items: center; gap: 10px; font-size: 0.9em; }
+        #selection-count { font-weight: bold; }
+
+        /* --- Question List & Items --- */
+        .question-item {
+            border: 1px solid var(--border-color);
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: var(--secondary-bg); /* Use secondary for contrast */
+            position: relative;
+            transition: background-color 0.2s ease;
+        }
+        .question-item.selected { background-color: var(--selected-bg); border-left: 3px solid var(--primary-color); } /* Style for selected items */
+        .question-item h3 {
+            margin: 0 0 10px 0; /* Adjusted margin */
+            font-size: 1.1em;
+            color: #343a40;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+         .question-item h3 span:first-child { display: flex; align-items: center; gap: 8px; } /* Group checkbox and title */
+        .question-item p { margin-bottom: 10px; color: var(--text-color); }
+        .question-item p strong { color: #495057; }
+        .question-item pre.stem-text {
+            white-space: pre-wrap; word-wrap: break-word;
+            font-family: inherit; font-size: 1em;
+            margin: 5px 0 15px 0;
+            background-color: #fdfdfd;
+            padding: 10px; border: 1px solid #eee; border-radius: 3px;
+        }
+        .question-item ul { padding-left: 25px; margin: 5px 0 10px 0; list-style: disc; }
+        .question-item li { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+        .question-item li .option-text { flex-grow: 1; margin-right: 10px; }
+
+        /* Copy Button Styles */
+        .copy-btn {
+            font-size: 0.8em; padding: 2px 6px;
+            visibility: hidden; /* Hidden by default */
+            opacity: 0;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            cursor: pointer; background-color: #e9ecef; border: none;
+        }
+        .question-item:hover .copy-btn, li:hover .copy-btn { visibility: visible; opacity: 1; } /* Show on hover */
+        .copy-feedback { font-size: 0.8em; color: green; margin-left: 5px; display: none; }
+
+        /* Checkbox Styles */
+        .select-mcq { transform: scale(1.2); cursor: pointer; accent-color: var(--primary-color); }
+
+        /* --- Pagination --- */
+        .pagination-controls {
+            padding: 15px 0;
+            margin-top: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            color: var(--muted-text-color);
+        }
+        .pagination-controls button { font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <h1>MCQ Collator</h1>
+
+    <!-- Upload Section -->
+    <div id="upload-section" class="section">
+        <h2>1. Upload & Process Transcript</h2>
+        <form id="upload-form">
+            <!-- File Input Area -->
+            <div class="file-selection-area">
+                <label for="transcript-file">Select .txt file:</label>
+                <input type="file" id="transcript-file" name="transcript" accept=".txt">
+                <span id="selected-filename">No file selected</span>
+            </div>
+
+            <!-- Date Range Selection Area (Initially Hidden) -->
+            <div id="date-range-section">
+                <p id="date-range-info">Analyzing file for date range...</p> <!-- Info/Status for Analysis -->
+                <div id="date-range-inputs">
+                    <div> <!-- Wrap label and input -->
+                        <label for="start-date">Process From:</label>
+                        <input type="date" id="start-date" name="startDate" disabled>
+                    </div>
+                    <div> <!-- Wrap label and input -->
+                        <label for="end-date">Process To:</label>
+                        <input type="date" id="end-date" name="endDate" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Button and Loading Indicator -->
+            <div style="display: flex; align-items: center;">
+                <button type="submit" id="upload-button" disabled>Process Transcript</button> <!-- Renamed slightly, starts disabled -->
+                 <span id="loading-indicator">
+                    <span class="spinner"></span>
+                    <span class="loading-text"></span> <!-- Text set dynamically -->
+                </span>
+            </div>
+        </form>
+        <div id="status-message"></div> <!-- For final upload/processing status -->
+    </div>
+
+    <!-- Questions Section -->
+    <div id="questions-section" class="section">
+        <!-- ... (Questions section remains the same structure) ... -->
+        <h2>2. Review & Export Questions</h2>
+
+        <!-- Persistent Controls -->
+        <div class="persistent-controls">
+            <div class="filter-controls">
+                <label for="filter-input">Filter stems:</label>
+                <input type="text" id="filter-input" placeholder="Enter keyword...">
+            </div>
+            <div class="selection-controls">
+                 <input type="checkbox" id="select-all-checkbox" title="Select/Deselect All Visible">
+                 <label for="select-all-checkbox">Select All Visible</label>
+                 <span>(<span id="selection-count">0</span> selected)</span>
+                 <button id="export-button" disabled>Export Selected</button>
+                 <button id="refresh-button">Refresh List</button>
+            </div>
+        </div>
+
+        <!-- Questions List -->
+        <div id="questions-list">
+            <p>Upload a transcript to see questions.</p> <!-- Updated initial message -->
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-controls" id="pagination-controls">
+            <!-- Pagination buttons/info generated here -->
+        </div>
+    </div>
+
+    <script>
+        // --- State Variables ---
+        let allQuestions = [];
+        let filteredQuestions = [];
+        let currentPage = 1;
+        const itemsPerPage = 20;
+        let selectedIds = new Set();
+        let currentAnalysisController = null; // To abort previous /analyze requests
+
+        // --- DOM Element References ---
+        const uploadForm = document.getElementById('upload-form');
+        const transcriptFile = document.getElementById('transcript-file');
+        const selectedFilenameSpan = document.getElementById('selected-filename');
+        const uploadButton = document.getElementById('upload-button');
+        const statusMessage = document.getElementById('status-message'); // For final upload status
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const loadingSpinner = loadingIndicator.querySelector('.spinner');
+        const loadingText = loadingIndicator.querySelector('.loading-text');
+
+        // NEW Date Range Elements
+        const dateRangeSection = document.getElementById('date-range-section');
+        const dateRangeInfo = document.getElementById('date-range-info');
+        const dateRangeInputsContainer = document.getElementById('date-range-inputs'); // Container div
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+
+        const refreshButton = document.getElementById('refresh-button');
+        const exportButton = document.getElementById('export-button');
+        const questionsListDiv = document.getElementById('questions-list');
+        const filterInput = document.getElementById('filter-input');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const selectionCountSpan = document.getElementById('selection-count');
+        const paginationControlsDiv = document.getElementById('pagination-controls');
+
+        // --- Helper Functions ---
+        function showStatusMessage(message, isError = false) {
+             statusMessage.textContent = message;
+             statusMessage.className = 'status-message'; // Reset classes
+             statusMessage.classList.add(isError ? 'status-error' : 'status-success');
+             statusMessage.style.display = 'block';
+             // Hide message after a delay
+             setTimeout(hideStatusMessage, isError ? 8000 : 5000); // Longer for errors
+        }
+        function hideStatusMessage() { statusMessage.style.display = 'none'; statusMessage.textContent = ''; }
+
+        // Updated showLoading to handle different states
+        function showLoading(isLoading, state = 'loading') { // state: 'loading', 'analyzing', 'processing'
+            if (isLoading) {
+                loadingIndicator.style.display = 'flex';
+                switch(state) {
+                    case 'analyzing':
+                        loadingText.textContent = 'Analyzing dates...';
+                        break;
+                    case 'processing':
+                        loadingText.textContent = 'Processing with AI...';
+                        break;
+                    default:
+                        loadingText.textContent = 'Loading...';
+                }
+            } else {
+                loadingIndicator.style.display = 'none';
+                loadingText.textContent = '';
+            }
+            // Disable relevant controls during any loading state
+            uploadButton.disabled = isLoading || !startDateInput.value || !endDateInput.value; // Enable only when dates are set and not loading
+            transcriptFile.disabled = isLoading; // Disable file input during activity
+            startDateInput.disabled = isLoading || !startDateInput.value; // Keep disabled if no value yet
+            endDateInput.disabled = isLoading || !endDateInput.value;
+            refreshButton.disabled = isLoading;
+            exportButton.disabled = isLoading || selectedIds.size === 0;
+            filterInput.disabled = isLoading;
+            selectAllCheckbox.disabled = isLoading;
+            paginationControlsDiv.querySelectorAll('button').forEach(btn => btn.disabled = isLoading);
+        }
+
+        async function copyToClipboard(textToCopy, feedbackElement) { /* ... (same as before) ... */
+             if (!navigator.clipboard) { alert("Clipboard API not available."); return; }
+             try {
+                 await navigator.clipboard.writeText(textToCopy);
+                 feedbackElement.textContent = 'Copied!'; feedbackElement.style.display = 'inline';
+                 setTimeout(() => { feedbackElement.style.display = 'none'; feedbackElement.textContent = ''; }, 1500);
+             } catch (err) { console.error('Failed to copy:', err); alert('Failed to copy.'); }
+         }
+
+        // NEW: Show/Update Date Range Info Area
+        function updateDateRangeInfo(message, type = 'info') { // type: 'info', 'success', 'error'
+            dateRangeInfo.textContent = message;
+            dateRangeInfo.className = 'date-range-info'; // Reset class
+            if (type !== 'info') {
+                dateRangeInfo.classList.add(type);
+            }
+            dateRangeInfo.style.display = 'block';
+        }
+
+        function hideDateRangeInfo() {
+             dateRangeInfo.style.display = 'none';
+             dateRangeInfo.textContent = '';
+             dateRangeInfo.className = 'date-range-info'; // Reset class
+        }
+
+         // --- Core Logic Functions ---
+         function applyFiltering() { /* ... (same as before) ... */
+             const query = filterInput.value.toLowerCase().trim();
+             if (query === '') {
+                 filteredQuestions = [...allQuestions]; // No filter, use all
+             } else {
+                 filteredQuestions = allQuestions.filter(q =>
+                     (q.stem_text || '').toLowerCase().includes(query)
+                 );
+             }
+             currentPage = 1; // Reset to first page after filtering
+             renderCurrentPage();
+             updateSelectionState(); // Update counts/buttons after filtering
+         }
+
+         function renderCurrentPage() { /* ... (same as before) ... */
+             if (!Array.isArray(filteredQuestions)) {
+                  console.error("renderCurrentPage: filteredQuestions is not an array.");
+                  questionsListDiv.innerHTML = '<p style="color: red;">Error displaying questions.</p>';
+                  return;
+             }
+
+             const startIndex = (currentPage - 1) * itemsPerPage;
+             const endIndex = startIndex + itemsPerPage;
+             const pageItems = filteredQuestions.slice(startIndex, endIndex);
+
+             if (allQuestions.length === 0 && filteredQuestions.length === 0) { // Check if *any* questions ever loaded
+                 questionsListDiv.innerHTML = '<p>Upload a transcript to see questions.</p>';
+             } else if (filteredQuestions.length === 0) {
+                 questionsListDiv.innerHTML = filterInput.value.trim() ? '<p>No questions match your filter.</p>' : '<p>No questions found or loaded yet.</p>';
+             } else if (pageItems.length === 0 && currentPage > 1) {
+                 currentPage--;
+                 renderCurrentPage();
+                 return;
+             } else {
+                 let html = '';
+                 pageItems.forEach((q, index) => {
+                     const dbId = q?._id || `temp_${startIndex + index}`;
+                     const stemText = q?.stem_text || 'N/A';
+                     const options = Array.isArray(q?.options) ? q.options : [];
+                     const isSelected = selectedIds.has(dbId);
+
+                     html += `
+                         <div class="question-item ${isSelected ? 'selected' : ''}" data-question-id="${dbId}">
+                             <h3>
+                                 <span>
+                                    <input type="checkbox" class="select-mcq" value="${dbId}" title="Select for export" ${isSelected ? 'checked' : ''}>
+                                    Q${startIndex + index + 1} <!-- Overall index -->
+                                 </span>
+                                 <span class="copy-feedback"></span>
+                                 <button class="copy-btn copy-stem-btn" title="Copy Stem Text">Copy Stem</button>
+                             </h3>
+                             <pre class="stem-text">${stemText}</pre>
+                             <p><strong>Options (${options.length}):</strong></p>
+                             <ul>
+                                 ${options.length > 0 ? options.map((opt, optIndex) => `
+                                     <li>
+                                         <span class="option-text">${opt}</span>
+                                         <span class="copy-feedback"></span>
+                                         <button class="copy-btn copy-option-btn" title="Copy Option Text">Copy</button>
+                                     </li>`).join('') : '<li>No options found</li>'}
+                             </ul>
+                         </div>
+                     `;
+                 });
+                 questionsListDiv.innerHTML = html;
+             }
+             renderPaginationControls();
+             updateSelectionState();
+         }
+
+         function renderPaginationControls() { /* ... (same as before) ... */
+            if (!filteredQuestions || filteredQuestions.length === 0) {
+                 paginationControlsDiv.innerHTML = ''; // Clear if no questions
+                 return;
+             }
+             const totalItems = filteredQuestions.length;
+             const totalPages = Math.ceil(totalItems / itemsPerPage);
+             if (totalPages <= 1 && totalItems > 0) { // Show total only if needed
+                  paginationControlsDiv.innerHTML = `<span>Total: ${totalItems} question${totalItems !== 1 ? 's' : ''}</span>`;
+                  return;
+             } else if (totalPages <=1) { // Hide if 0 items or 1 page
+                 paginationControlsDiv.innerHTML = '';
+                 return;
+             }
+
+
+             let html = `
+                 <button id="prev-page-btn" ${currentPage === 1 ? 'disabled' : ''}>« Previous</button>
+                 <span>Page ${currentPage} of ${totalPages} (Total: ${totalItems})</span>
+                 <button id="next-page-btn" ${currentPage === totalPages ? 'disabled' : ''}>Next »</button>
+             `;
+             paginationControlsDiv.innerHTML = html;
+
+             document.getElementById('prev-page-btn')?.addEventListener('click', () => {
+                 if (currentPage > 1) { currentPage--; renderCurrentPage(); }
+             });
+             document.getElementById('next-page-btn')?.addEventListener('click', () => {
+                 if (currentPage < totalPages) { currentPage++; renderCurrentPage(); }
+             });
+         }
+
+         function updateSelectionState() { /* ... (same as before) ... */
+            selectionCountSpan.textContent = selectedIds.size;
+            exportButton.disabled = selectedIds.size === 0 || loadingIndicator.style.display !== 'none';
+
+            const visibleCheckboxes = questionsListDiv.querySelectorAll('.select-mcq');
+            if (visibleCheckboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.disabled = true;
+                return;
+            }
+            selectAllCheckbox.disabled = false;
+
+            let allVisibleSelected = true;
+            let noneVisibleSelected = true;
+            visibleCheckboxes.forEach(cb => {
+                if (selectedIds.has(cb.value)) {
+                    noneVisibleSelected = false;
+                } else {
+                    allVisibleSelected = false;
+                }
+            });
+
+            if (allVisibleSelected) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (noneVisibleSelected) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        // --- API Call Functions ---
+        async function fetchQuestions() {
+             showLoading(true, 'loading'); questionsListDiv.innerHTML = '<p>Loading questions...</p>'; exportButton.disabled = true; selectedIds.clear();
+             try {
+                 // Timeout logic (optional but good practice)
+                 const controller = new AbortController();
+                 const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+                const response = await fetch('/questions', { signal: controller.signal });
+                 clearTimeout(timeoutId);
+
+                 if (!response.ok) { let errorMsg = `HTTP error! status: ${response.status}`; try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (jsonError) { } throw new Error(errorMsg); }
+                const data = await response.json(); if (data.success) {
+                    allQuestions = data.questions || [];
+                    applyFiltering();
+                    if (allQuestions.length === 0) {
+                        questionsListDiv.innerHTML = '<p>No questions currently stored in the database.</p>';
+                    }
+                } else { throw new Error(data.message || 'Failed to fetch questions.'); }
+             } catch (error) {
+                 console.error('Error fetching questions:', error);
+                 let userMessage = `Error fetching questions: ${error.message}`;
+                 if (error.name === 'AbortError') { userMessage = 'Error: Request timed out fetching questions.'; }
+                 questionsListDiv.innerHTML = `<p style="color: red;">${userMessage}</p>`;
+                 allQuestions = []; applyFiltering();
+             } finally { showLoading(false); updateSelectionState(); }
+        }
+
+        // NEW: Analyze the selected file for date range
+        async function analyzeFile(file) {
+            if (!file) return;
+
+            // Abort previous analysis request if a new file is selected quickly
+            if (currentAnalysisController) {
+                currentAnalysisController.abort();
+                console.log("Aborted previous analysis request.");
+            }
+            currentAnalysisController = new AbortController();
+            const signal = currentAnalysisController.signal;
+
+            showLoading(true, 'analyzing');
+            dateRangeSection.style.display = 'block'; // Show section
+            dateRangeInputsContainer.style.display = 'none'; // Hide inputs initially
+            updateDateRangeInfo('Analyzing file for date range...', 'info'); // Show analyzing message
+            startDateInput.value = ''; endDateInput.value = ''; // Clear old dates
+            startDateInput.disabled = true; endDateInput.disabled = true;
+            uploadButton.disabled = true; // Keep disabled until analysis succeeds
+
+            const formData = new FormData();
+            formData.append('transcript', file);
+
+            try {
+                const response = await fetch('/analyze', { method: 'POST', body: formData, signal: signal });
+
+                // Check if request was aborted after fetch started but before completion
+                if (signal.aborted) {
+                    console.log("Analysis request aborted during fetch.");
+                    // Don't process response, maybe hide loading if it was the *last* request
+                    // showLoading(false); // Be cautious here if another request started immediately
+                    return;
+                }
+
+                let data;
+                try {
+                     data = await response.json();
+                } catch (jsonError) {
+                     console.error("Analyze response not JSON:", await response.text());
+                     throw new Error(`Server returned non-JSON during analysis. Status: ${response.status}`);
+                }
+
+                if (response.ok && data.success) {
+                    updateDateRangeInfo(data.message || `Detected range: ${data.startDate} to ${data.endDate}`, 'success');
+                    startDateInput.value = data.startDate;
+                    endDateInput.value = data.endDate;
+                    startDateInput.disabled = false; // Enable date inputs
+                    endDateInput.disabled = false;
+                    dateRangeInputsContainer.style.display = 'flex'; // Show inputs
+                    uploadButton.disabled = false; // Enable Process button
+                    showLoading(false); // Stop loading indicator
+                } else {
+                    throw new Error(data.message || `Analysis failed: ${response.status}`);
+                }
+            } catch (error) {
+                 if (error.name === 'AbortError') {
+                    console.log('Analysis fetch aborted.'); // Expected if user selects new file quickly
+                    // No user message needed unless it's the *last* action
+                    updateDateRangeInfo('Analysis cancelled.', 'info');
+                 } else {
+                    console.error('Error analyzing file:', error);
+                    updateDateRangeInfo(`Error: ${error.message}`, 'error');
+                    dateRangeInputsContainer.style.display = 'none'; // Hide inputs on error
+                    showLoading(false); // Stop loading indicator even on error
+                }
+                 // Keep Process button disabled on error/abort
+                 uploadButton.disabled = true;
+            } finally {
+                // Clear the controller if this request finished (or was aborted)
+                 if (signal === currentAnalysisController?.signal) {
+                    currentAnalysisController = null;
+                }
+            }
+        }
+
+
+        // MODIFIED: Handle the main transcript processing submission
+        async function uploadTranscript(event) {
+             event.preventDefault();
+             hideStatusMessage(); // Clear previous final status
+
+             const file = transcriptFile.files[0];
+             const startDate = startDateInput.value;
+             const endDate = endDateInput.value;
+
+             if (!file) { showStatusMessage("Please select a transcript file first.", true); return; }
+             if (!startDate || !endDate) { showStatusMessage("Please wait for file analysis and ensure dates are set.", true); return; }
+
+             // Basic date validation
+             if (new Date(startDate) > new Date(endDate)) {
+                 showStatusMessage("Error: Start date cannot be after end date.", true);
+                 // Optionally visually highlight date inputs
+                 startDateInput.style.borderColor = 'red';
+                 endDateInput.style.borderColor = 'red';
+                 return;
+             } else {
+                 // Reset border color if previously error
+                 startDateInput.style.borderColor = '';
+                 endDateInput.style.borderColor = '';
+             }
+
+             showLoading(true, 'processing'); // Show processing state
+
+             const formData = new FormData();
+             formData.append('transcript', file);
+             formData.append('startDate', startDate); // Add dates to form data
+             formData.append('endDate', endDate);
+
+             try {
+                 // Add timeout for the upload/processing step too
+                 const controller = new AbortController();
+                 const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout for AI processing
+
+                const response = await fetch('/upload', { method: 'POST', body: formData, signal: controller.signal });
+                 clearTimeout(timeoutId);
+
+                 let data;
+                 try { data = await response.json(); } catch (jsonError) { console.error("Upload response not JSON:", await response.text()); throw new Error(`Server returned non-JSON. Status: ${response.status}`); }
+
+                if (response.ok && data.success) {
+                     showStatusMessage(`Success: ${data.message || 'File processed.'} (${data.questions_saved || 0} questions saved/updated)`, false);
+                     // Don't clear file input or dates automatically - user might want to re-process slightly different range
+                     // transcriptFile.value = ''; selectedFilenameSpan.textContent = 'No file selected'; dateRangeSection.style.display = 'none';
+                     fetchQuestions(); // Refresh the questions list
+                 } else { throw new Error(data.message || `Processing failed: ${response.status}`); }
+             } catch (error) {
+                 console.error('Error processing transcript:', error);
+                 let userMessage = `Error: ${error.message}`;
+                 if (error.name === 'AbortError') { userMessage = 'Error: Transcript processing timed out.'; }
+                 showStatusMessage(userMessage, true);
+             } finally {
+                 showLoading(false);
+                 // Re-enable button IF dates are still valid (they should be unless cleared)
+                 uploadButton.disabled = !startDateInput.value || !endDateInput.value;
+             }
+        }
+
+        async function handleExport() { /* ... (same as before) ... */
+            const questionIds = Array.from(selectedIds); // Get IDs from the Set
+             if (questionIds.length === 0) { showStatusMessage("No questions selected for export.", true); return; }
+             console.log("Exporting IDs:", questionIds); showLoading(true, 'loading'); // Generic loading for export
+             hideStatusMessage();
+             try {
+                 // Add timeout for export
+                 const controller = new AbortController();
+                 const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for export
+
+                const response = await fetch('/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question_ids: questionIds }), signal: controller.signal });
+                 clearTimeout(timeoutId);
+
+                if (!response.ok) { let errorMsg = `Export failed: ${response.status}`; try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch(e) {} throw new Error(errorMsg); }
+                const blob = await response.blob(); const downloadUrl = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.style.display = 'none'; a.href = downloadUrl;
+                const disposition = response.headers.get('content-disposition'); let filename = 'collated_mcqs.xlsx'; if (disposition && disposition.includes('attachment')) { const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition); if (matches?.[1]) { filename = matches[1].replace(/['"]/g, ''); } }
+                a.download = filename; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(downloadUrl); a.remove(); showStatusMessage(`Successfully exported ${questionIds.length} questions.`, false);
+             } catch (error) {
+                 console.error('Export error:', error);
+                 let userMessage = `Export Error: ${error.message}`;
+                 if (error.name === 'AbortError') { userMessage = 'Error: Export request timed out.'; }
+                 showStatusMessage(userMessage, true);
+             } finally { showLoading(false); }
+         }
+
+        // --- Event Handlers ---
+        // MODIFIED: Trigger analysis on file change
+        function handleFileInputChange() {
+            hideStatusMessage(); // Clear status from previous actions
+            if (transcriptFile.files && transcriptFile.files.length > 0) {
+                const file = transcriptFile.files[0];
+                selectedFilenameSpan.textContent = file.name;
+                // Clear previous results and disable processing until analysis is done
+                allQuestions = []; filteredQuestions = []; selectedIds.clear(); renderCurrentPage(); updateSelectionState(); paginationControlsDiv.innerHTML = ''; // Clear question list + pagination
+                uploadButton.disabled = true; // Disable process button
+                dateRangeSection.style.display = 'none'; // Hide date section initially
+                analyzeFile(file); // Trigger the analysis
+            } else {
+                selectedFilenameSpan.textContent = 'No file selected';
+                uploadButton.disabled = true; // Keep disabled if no file
+                dateRangeSection.style.display = 'none'; // Hide date section
+                // Optionally clear question list if file is deselected
+                // allQuestions = []; filteredQuestions = []; selectedIds.clear(); renderCurrentPage(); updateSelectionState(); paginationControlsDiv.innerHTML = '';
+            }
+        }
+
+        function handleSelectAllChange(event) { /* ... (same as before) ... */
+            const isChecked = event.target.checked;
+            const visibleCheckboxes = questionsListDiv.querySelectorAll('.select-mcq');
+            visibleCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+                const questionItem = cb.closest('.question-item');
+                const questionId = cb.value;
+                if (isChecked) {
+                    selectedIds.add(questionId);
+                    questionItem?.classList.add('selected');
+                } else {
+                    selectedIds.delete(questionId);
+                    questionItem?.classList.remove('selected');
+                }
+            });
+            updateSelectionState();
+        }
+
+        function handleListInteraction(event) { /* ... (same as before) ... */
+            const target = event.target;
+            const questionItem = target.closest('.question-item');
+            const questionId = questionItem?.dataset.questionId;
+
+            // Handle Checkbox Click
+            if (target.classList.contains('select-mcq') && questionId) {
+                if (target.checked) {
+                    selectedIds.add(questionId);
+                    questionItem?.classList.add('selected');
+                } else {
+                    selectedIds.delete(questionId);
+                    questionItem?.classList.remove('selected');
+                }
+                updateSelectionState(); // Update count, export button, select-all state
+            }
+            // Handle Copy Stem
+            else if (target.classList.contains('copy-stem-btn')) {
+                 const stemElement = questionItem?.querySelector('.stem-text');
+                 const feedbackElement = target.previousElementSibling;
+                 if (stemElement && feedbackElement) copyToClipboard(stemElement.textContent || '', feedbackElement);
+            }
+            // Handle Copy Option
+            else if (target.classList.contains('copy-option-btn')) {
+                 const listItem = target.closest('li');
+                 const optionElement = listItem?.querySelector('.option-text');
+                 const feedbackElement = target.previousElementSibling;
+                 if (optionElement && feedbackElement) copyToClipboard(optionElement.textContent || '', feedbackElement);
+            }
+        }
+
+        // Add listener for date changes to reset error highlighting
+        function handleDateInputChange() {
+             startDateInput.style.borderColor = '';
+             endDateInput.style.borderColor = '';
+        }
+
+        // --- Initialization ---
+        function initializeApp() {
+            // Attach listeners
+            uploadForm.addEventListener('submit', uploadTranscript);
+            transcriptFile.addEventListener('change', handleFileInputChange);
+            refreshButton.addEventListener('click', fetchQuestions);
+            exportButton.addEventListener('click', handleExport);
+            filterInput.addEventListener('input', applyFiltering);
+            selectAllCheckbox.addEventListener('change', handleSelectAllChange);
+            questionsListDiv.addEventListener('click', handleListInteraction);
+            startDateInput.addEventListener('change', handleDateInputChange); // Listen for date changes
+            endDateInput.addEventListener('change', handleDateInputChange); // Listen for date changes
+
+
+            fetchQuestions(); // Fetch existing questions on load
+            handleFileInputChange(); // Set initial button/state based on whether a file is pre-selected (unlikely but safe)
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+    </script>
+
+</body>
+</html>
